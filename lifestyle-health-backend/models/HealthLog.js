@@ -31,6 +31,11 @@ const healthLogSchema = new mongoose.Schema({
         type: Number,
         min: 0,
         max: 1
+    },
+    aiRiskScore: {
+        type: Number,
+        min: 0,
+        max: 1
     }
 }, {
     timestamps: true 

@@ -60,12 +60,23 @@ def predict_risk():
 
         prediction = model.predict([input_features])[0]
         probabilities = model.predict_proba([input_features])[0]
-        
+
+        classes = list(model.classes_)
+        high_risk_index = next(
+            (index for index, value in enumerate(classes)
+             if value == 1 or str(value).lower() == "high"),
+            None
+        )
+        if high_risk_index is None:
+            return jsonify({"error": "Model does not expose a high-risk class."}), 500
+
         confidence = round(float(max(probabilities)), 4)
+        high_risk_probability = round(float(probabilities[high_risk_index]), 4)
         risk_level = "High" if prediction == 1 or str(prediction).lower() == 'high' else "Low"
 
         return jsonify({
             "risk": risk_level,
+            "risk_score": high_risk_probability,
             "confidence": confidence
         }), 200
 

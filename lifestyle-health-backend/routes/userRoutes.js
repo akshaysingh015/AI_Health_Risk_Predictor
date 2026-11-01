@@ -58,12 +58,17 @@ router.post('/daily-log', protect, async (req, res) => {
 
         const aiResult = await pythonResponse.json();
 
-        if (!pythonResponse.ok || !aiResult.risk || typeof aiResult.confidence !== 'number') {
+        if (
+            !pythonResponse.ok ||
+            !aiResult.risk ||
+            typeof aiResult.confidence !== 'number' ||
+            typeof aiResult.risk_score !== 'number'
+        ) {
             return res.status(502).json({ message: aiResult.error || 'AI Engine returned an invalid response.' });
         }
 
         const riskLevel = aiResult.risk === 'High' ? 'High Risk' : 'Low Risk';
-        const riskScore = Math.round(aiResult.confidence * 100);
+        const riskScore = Math.round(aiResult.risk_score * 100);
         const log = await HealthLog.create({
             user: req.user.id,
             sleepHours: values.sleep,
@@ -74,7 +79,8 @@ router.post('/daily-log', protect, async (req, res) => {
             waterIntake: values.water,
             junkFoodFrequency: values.junkFood,
             aiRiskPrediction: riskLevel,
-            aiConfidence: aiResult.confidence
+            aiConfidence: aiResult.confidence,
+            aiRiskScore: aiResult.risk_score
         });
 
         res.status(201).json({ riskLevel, riskScore, log });

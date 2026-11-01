@@ -38,7 +38,12 @@ const createHealthLog = async (req, res) => {
         });
 
         const aiData = await aiResponse.json();
-        if (!aiResponse.ok || !aiData.risk || typeof aiData.confidence !== 'number') {
+        if (
+            !aiResponse.ok ||
+            !aiData.risk ||
+            typeof aiData.confidence !== 'number' ||
+            typeof aiData.risk_score !== 'number'
+        ) {
             return res.status(502).json({ message: aiData.error || "AI analysis failed" });
         }
 
@@ -52,14 +57,15 @@ const createHealthLog = async (req, res) => {
             waterIntake,
             junkFoodFrequency,
             aiRiskPrediction: aiData.risk === "High" ? "High Risk" : "Low Risk",
-            aiConfidence: aiData.confidence
+            aiConfidence: aiData.confidence,
+            aiRiskScore: aiData.risk_score
         });
 
         res.status(201).json({
             message: "Health log saved and analyzed by AI!",
             log,
             riskLevel: log.aiRiskPrediction,
-            riskScore: Math.round(aiData.confidence * 100)
+            riskScore: Math.round(aiData.risk_score * 100)
         });
 
     } catch (error) {

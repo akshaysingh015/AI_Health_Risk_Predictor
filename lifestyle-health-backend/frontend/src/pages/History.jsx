@@ -7,10 +7,12 @@ function History() {
     const [isLoading, setIsLoading] = useState(true);
     const [expandedCard, setExpandedCard] = useState(null);
     const [historyData, setHistoryData] = useState([]);
+    const [loadError, setLoadError] = useState('');
 
     useEffect(() => {
         const loadHistory = async () => {
             try {
+                setLoadError('');
                 const response = await API.get('/health/history');
                 setHistoryData(response.data.history.map((log) => ({
                     id: log._id,
@@ -22,11 +24,22 @@ function History() {
                     water: log.waterIntake,
                     junkFood: log.junkFoodFrequency,
                     riskLevel: log.aiRiskPrediction,
-                    riskScore: Math.round((log.aiConfidence || 0) * 100)
+                    riskScore: Math.round((
+                        log.aiRiskScore ??
+                        (log.aiRiskPrediction === 'High Risk'
+                            ? log.aiConfidence
+                            : 1 - log.aiConfidence)
+                    ) * 100)
                 })));
             } catch (error) {
                 console.error('Unable to load health history:', error);
                 setHistoryData([]);
+                if (error.response?.status === 401) {
+                    localStorage.removeItem('token');
+                    navigate('/login');
+                } else {
+                    setLoadError(error.response?.data?.message || 'Unable to load your health history.');
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -35,11 +48,10 @@ function History() {
         loadHistory();
         window.addEventListener('focus', loadHistory);
         return () => window.removeEventListener('focus', loadHistory);
-    }, []);
+    }, [navigate]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        localStorage.removeItem('dailyCompleted');
         navigate('/login');
     };
 
@@ -81,6 +93,10 @@ function History() {
                                 <div className="w-24 h-4 bg-gradient-to-r from-[#eff4ff] via-[#dce9ff] to-[#eff4ff] bg-[length:200%_100%] animate-[shimmer_1.5s_infinite] rounded"></div>
                                 <div className="w-24 h-6 bg-gradient-to-r from-[#eff4ff] via-[#dce9ff] to-[#eff4ff] bg-[length:200%_100%] animate-[shimmer_1.5s_infinite] rounded-full"></div>
                             </div>
+                        </div>
+                    ) : loadError ? (
+                        <div className="text-center py-12">
+                            <p className="text-[#ba1a1a] font-medium" role="alert">{loadError}</p>
                         </div>
                     ) : historyData.length === 0 ? (
                         <div className="text-center py-12">

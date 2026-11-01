@@ -9,20 +9,12 @@ function Dashboard() {
     const [lastScrollY, setLastScrollY] = useState(0);
     
     // Check local storage to see if we already did the check-in today
-    const [showDailyPrompt, setShowDailyPrompt] = useState(() => {
-        return localStorage.getItem('dailyCompleted') !== 'true';
-    }); 
+    const [showDailyPrompt, setShowDailyPrompt] = useState(true);
     const [showAdjustment, setShowAdjustment] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisError, setAnalysisError] = useState('');
 
-    // Grab today's result from history if it exists to display dynamically
-    const [todayResult, setTodayResult] = useState(() => {
-        if (localStorage.getItem('dailyCompleted') === 'true') {
-            const history = JSON.parse(localStorage.getItem('healthHistory')) || [];
-            if (history.length > 0) return { level: history[0].riskLevel, score: history[0].riskScore };
-        }
-        return { level: 'Not analyzed', score: null };
-    });
+    const [todayResult, setTodayResult] = useState({ level: 'Not analyzed', score: null });
 
     const [dailyLog, setDailyLog] = useState({
         sleep: 7.5,
@@ -36,41 +28,51 @@ function Dashboard() {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        localStorage.removeItem('dailyCompleted'); // Reset for testing
         navigate('/login');
     };
 
-    const saveToHistory = (logData, riskLevel, riskScore) => {
-        const newEntry = {
-            id: Date.now(),
-            // Add the exact time so you can distinguish between them!
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + 
-                  " at " + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-            ...logData,
-            riskLevel: riskLevel,
-            riskScore: riskScore
+    useEffect(() => {
+        const loadTodayResult = async () => {
+            try {
+                const response = await API.get('/health/history');
+                const latestLog = response.data.history?.[0];
+                const isToday = latestLog &&
+                    new Date(latestLog.logDate).toDateString() === new Date().toDateString();
+
+                if (isToday) {
+                    setTodayResult({
+                        level: latestLog.aiRiskPrediction,
+                        score: Math.round((
+                            latestLog.aiRiskScore ??
+                            (latestLog.aiRiskPrediction === 'High Risk'
+                                ? latestLog.aiConfidence
+                                : 1 - latestLog.aiConfidence)
+                        ) * 100)
+                    });
+                    setShowDailyPrompt(false);
+                }
+            } catch (error) {
+                console.error('Unable to load today health log:', error);
+            }
         };
 
-        const existingHistory = JSON.parse(localStorage.getItem('healthHistory')) || [];
-        // Add the new entry at the START of the array
-        localStorage.setItem('healthHistory', JSON.stringify([newEntry, ...existingHistory]));
-        localStorage.setItem('dailyCompleted', 'true');
-        
-        setTodayResult({ level: riskLevel, score: riskScore }); 
-    };
+        loadTodayResult();
+    }, []);
 
     const submitDailyLog = async () => {
         setIsAnalyzing(true);
+        setAnalysisError('');
 
         try {
             const response = await API.post('/users/daily-log', dailyLog);
             const { riskLevel, riskScore } = response.data;
 
-            saveToHistory(dailyLog, riskLevel, riskScore);
+            setTodayResult({ level: riskLevel, score: riskScore });
             setShowDailyPrompt(false);
             setShowAdjustment(false);
         } catch (error) {
             console.error('Daily health analysis failed:', error);
+            setAnalysisError(error.response?.data?.message || 'Unable to save your daily log. Please try again.');
         } finally {
             setIsAnalyzing(false);
         }
@@ -177,6 +179,11 @@ function Dashboard() {
                                 </form>
                             </div>
                             <div className="pt-4 border-t border-[#c3c5d9]/30 shrink-0 mt-2">
+                                {analysisError && (
+                                    <p className="mb-3 text-sm font-medium text-[#ba1a1a]" role="alert">
+                                        {analysisError}
+                                    </p>
+                                )}
                                 <button type="submit" form="adjustment-form" disabled={isAnalyzing} className="w-full bg-[#003dcb] text-white font-bold py-4 rounded-xl flex justify-center items-center gap-2">
                                     {isAnalyzing ? <span className="material-symbols-outlined animate-spin">sync</span> : <><span className="material-symbols-outlined">auto_awesome</span> Analyze Risk</>}
                                 </button>
