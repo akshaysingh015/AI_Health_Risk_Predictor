@@ -1,0 +1,54 @@
+# ==============================
+# Environment variables & secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+**/.env
+**/.env.*
+!**/.env.example
+
+# Firebase credentials
+**/firebase-service-account.json
+**/*service-account*.json
+**/firebase-adminsdk-*.json
+
+# ==============================
+# Node.js dependencies
+# ==============================
+**/node_modules/
+
+# ==============================
+# Python environments
+# ==============================
+**/venv/
+**/.venv/
+**/__pycache__/
+*.py[cod]
+
+# Python cache and testing
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==============================
+# Build files
+# ==============================
+**/dist/
+**/build/
+**/.next/
+**/coverage/
+
+# ==============================
+# Logs
+# ==============================
+*.log
+npm-debug.log*
+
+# ==============================
+# OS files
+# ==============================
+.DS_Store
+Thumbs.db
+
