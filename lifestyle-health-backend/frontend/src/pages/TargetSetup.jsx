@@ -25,11 +25,9 @@ function TargetSetup() {
         e.preventDefault();
         setIsLoading(true);
 
-        // Simulate saving to Node.js backend
-        setTimeout(() => {
-            setIsLoading(false);
-            navigate('/dashboard'); 
-        }, 1500);
+        localStorage.setItem('healthTargets', JSON.stringify(targets));
+        setIsLoading(false);
+        navigate('/dashboard');
     };
 
     return (

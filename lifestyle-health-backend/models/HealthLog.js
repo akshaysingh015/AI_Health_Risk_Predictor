@@ -26,6 +26,11 @@ const healthLogSchema = new mongoose.Schema({
     aiRiskPrediction: {
         type: String,
         default: "Pending AI Analysis"
+    },
+    aiConfidence: {
+        type: Number,
+        min: 0,
+        max: 1
     }
 }, {
     timestamps: true 

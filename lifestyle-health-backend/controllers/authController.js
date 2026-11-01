@@ -13,13 +13,16 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, password } = req.body;
+        const emailAddress = typeof req.body.email === 'string'
+            ? req.body.email.trim().toLowerCase()
+            : '';
 
-        if (!name || !email || !password) {
+        if (!name || !emailAddress || !password) {
             return res.status(400).json({ message: "Please enter all fields" });
         }
 
-        const userExists = await User.findOne({ email });
+        const userExists = await User.findOne({ email: emailAddress });
         if (userExists) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -29,7 +32,7 @@ const registerUser = async (req, res) => {
 
         const user = await User.create({
             name,
-            email,
+            email: emailAddress,
             password: hashedPassword
         });
 
@@ -52,13 +55,16 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { password } = req.body;
+        const emailAddress = typeof req.body.email === 'string'
+            ? req.body.email.trim().toLowerCase()
+            : '';
 
-        if (!email || !password) {
+        if (!emailAddress || !password) {
             return res.status(400).json({ message: "Please enter all fields" });
         }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: emailAddress });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password" });
         }

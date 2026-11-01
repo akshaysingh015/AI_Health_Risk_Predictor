@@ -37,7 +37,7 @@ function Login() {
         try {
             // Hits endpoint: POST /api/auth/login
             const response = await API.post('/auth/login', {
-                email: formData.email,
+                email: formData.email.trim(),
                 password: formData.password
             });
 
@@ -89,7 +89,7 @@ function Login() {
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                placeholder="name@clinic.com" 
+                                placeholder="you@example.com"
                                 required 
                                 type="email"
                             />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import API from '../services/api';
 
 function History() {
     const navigate = useNavigate();
@@ -8,14 +9,27 @@ function History() {
     const [historyData, setHistoryData] = useState([]);
 
     useEffect(() => {
-        // Function to fetch latest data from localStorage
-        const loadHistory = () => {
-            const rawData = localStorage.getItem('healthHistory');
-            console.log("🔍 History Page - Found in Storage:", rawData); // This will tell us if it's seeing your data
-            
-            const savedHistory = JSON.parse(rawData) || [];
-            setHistoryData(savedHistory);
-            setIsLoading(false);
+        const loadHistory = async () => {
+            try {
+                const response = await API.get('/health/history');
+                setHistoryData(response.data.history.map((log) => ({
+                    id: log._id,
+                    date: new Date(log.logDate).toLocaleString(),
+                    steps: log.dailySteps,
+                    sleep: log.sleepHours,
+                    exercise: log.exerciseMinutes,
+                    screenTime: log.screenTime,
+                    water: log.waterIntake,
+                    junkFood: log.junkFoodFrequency,
+                    riskLevel: log.aiRiskPrediction,
+                    riskScore: Math.round((log.aiConfidence || 0) * 100)
+                })));
+            } catch (error) {
+                console.error('Unable to load health history:', error);
+                setHistoryData([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         loadHistory();

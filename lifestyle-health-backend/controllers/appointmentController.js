@@ -5,33 +5,36 @@ const admin = require('firebase-admin');
 
 exports.bookAppointment = async (req, res) => {
   try {
+    if (!admin.apps.length) {
+      return res.status(503).json({ error: "Notifications are not configured on this server." });
+    }
+
     // 1. Grab the data sent from the React frontend
-    const { patientId, date, time } = req.body;
+    const { date, time } = req.body;
 
-    // 2. (Future Step) Save the appointment to MongoDB here
-    // const newAppointment = await Appointment.create({ ... });
+    if (!date || !time) {
+      return res.status(400).json({ error: "Appointment date and time are required." });
+    }
 
-    // 3. (Future Step) Find the patient in the DB to get their specific FCM Token
-    // const patient = await User.findById(patientId);
-    
-    // --- TEMPORARY MOCK TOKEN FOR TESTING ---
-    const mockUserToken = "eZDHSg7Mz0hf_PGovtZ0It:APA91bGnYX3drgsA29KlQb64xavREKld2Vprc2NzAYweaoUsTVppWAaSBhcgrbjyCLFiS9WNrSiUmiJkBp0-8wJpGvvnQBMxlpWShFJxUC8OAYsDS5xuOsc"; 
+    const user = await require('../models/User').findById(req.user.id);
+    if (!user?.fcmToken) {
+      return res.status(503).json({ error: "Notifications are not enabled for this account." });
+    }
 
-    // 4. Send the Firebase Notification
-    if (mockUserToken) {
+    // Send the Firebase notification to the authenticated user's registered device.
+    if (user.fcmToken) {
       const message = {
         notification: {
           title: "🗓️ Appointment Confirmed!",
           body: `Your appointment is scheduled for ${date} at ${time}.`
         },
-        token: mockUserToken
+        token: user.fcmToken
       };
 
       await admin.messaging().send(message);
       console.log("✅ Notification successfully sent from controller!");
     }
 
-    // 5. Send success response back to React
     res.status(200).json({ 
         success: true, 
         message: "Appointment booked and notification sent!" 

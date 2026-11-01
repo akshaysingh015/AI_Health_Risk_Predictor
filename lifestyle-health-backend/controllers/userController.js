@@ -7,6 +7,10 @@ const updateUserProfile = async (req, res) => {
     try {
         const { age, gender, height, weight, bmi, smokingHabit, alcoholConsumption } = req.body;
 
+        if ([age, height, weight, bmi].some((value) => value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0))) {
+            return res.status(400).json({ message: "Profile measurements must be valid non-negative numbers." });
+        }
+
         // 1. Find the user who is currently logged in
         const user = await User.findById(req.user.id);
 
@@ -15,13 +19,13 @@ const updateUserProfile = async (req, res) => {
         }
 
         // 2. Update their permanent profile data
-        user.age = age || user.age;
-        user.gender = gender || user.gender;
-        user.height = height || user.height;
-        user.weight = weight || user.weight;
-        user.bmi = bmi || user.bmi;
-        user.smokingHabit = smokingHabit || user.smokingHabit;
-        user.alcoholConsumption = alcoholConsumption || user.alcoholConsumption;
+        if (age !== undefined) user.age = age;
+        if (gender !== undefined) user.gender = gender;
+        if (height !== undefined) user.height = height;
+        if (weight !== undefined) user.weight = weight;
+        if (bmi !== undefined) user.bmi = bmi;
+        if (smokingHabit !== undefined) user.smokingHabit = smokingHabit;
+        if (alcoholConsumption !== undefined) user.alcoholConsumption = alcoholConsumption;
 
         // 3. Save the updated user to MongoDB
         const updatedUser = await user.save();

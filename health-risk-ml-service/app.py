@@ -5,19 +5,19 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  
+CORS(app, origins=os.environ.get("CLIENT_ORIGIN", "http://localhost:5173"))
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'health_risk_model.pkl')
 
 try:
     if os.path.exists(MODEL_PATH):
         model = joblib.load(MODEL_PATH)
-        print("✅ Machine Learning model loaded successfully into memory.")
+        print("[OK] Machine Learning model loaded successfully into memory.")
     else:
-        print(f"❌ Error: Model file not found at {MODEL_PATH}")
+        print(f"[ERROR] Model file not found at {MODEL_PATH}")
         model = None
 except Exception as e:
-    print(f"❌ Failed to load the model file: {str(e)}")
+    print(f"[ERROR] Failed to load the model file: {str(e)}")
     model = None
 
 @app.route('/predict', methods=['POST'])

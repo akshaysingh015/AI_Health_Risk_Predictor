@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import API from '../services/api';
 
 const BookAppointmentButton = () => {
   const [status, setStatus] = useState('');
@@ -7,30 +8,10 @@ const BookAppointmentButton = () => {
     setStatus('Sending request to backend...');
     
     try {
-      // Make sure 3000 matches your Node.js backend port!
-      const response = await fetch('http://localhost:3000/api/appointments/book', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          patientId: "12345", 
-          date: "Tomorrow",
-          time: "10:00 AM"
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus('✅ Success! The backend just fired the notification.');
-        console.log("Backend says:", data);
-      } else {
-        setStatus('❌ Backend received it, but something went wrong.');
-        console.error("Backend error:", data);
-      }
+      await API.post('/appointments/book', { date: 'Tomorrow', time: '10:00 AM' });
+      setStatus('Appointment notification sent successfully.');
     } catch (error) {
-      setStatus('❌ Network Error: Could not reach the backend.');
+      setStatus(error.response?.data?.error || 'Could not send the appointment notification.');
       console.error(error);
     }
   };

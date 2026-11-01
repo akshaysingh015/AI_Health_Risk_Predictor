@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import BookAppointmentButton from '../components/BookAppointmentButton';
+import API from '../services/api';
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -20,7 +21,7 @@ function Dashboard() {
             const history = JSON.parse(localStorage.getItem('healthHistory')) || [];
             if (history.length > 0) return { level: history[0].riskLevel, score: history[0].riskScore };
         }
-        return { level: 'Low Risk', score: 12 }; // Default fallback
+        return { level: 'Not analyzed', score: null };
     });
 
     const [dailyLog, setDailyLog] = useState({
@@ -58,24 +59,30 @@ function Dashboard() {
         setTodayResult({ level: riskLevel, score: riskScore }); 
     };
 
+    const submitDailyLog = async () => {
+        setIsAnalyzing(true);
+
+        try {
+            const response = await API.post('/users/daily-log', dailyLog);
+            const { riskLevel, riskScore } = response.data;
+
+            saveToHistory(dailyLog, riskLevel, riskScore);
+            setShowDailyPrompt(false);
+            setShowAdjustment(false);
+        } catch (error) {
+            console.error('Daily health analysis failed:', error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handlePerfectDay = () => {
-        saveToHistory(dailyLog, 'Low Risk', 12);
-        setShowDailyPrompt(false);
+        submitDailyLog();
     };
 
     const handleAdjustmentSubmit = (e) => {
         e.preventDefault();
-        setIsAnalyzing(true);
-        
-        setTimeout(() => {
-            // Determine a fake risk level based on sleep for the prototype
-            const risk = dailyLog.sleep < 5 ? 'High Risk' : dailyLog.sleep < 6.5 ? 'Moderate Risk' : 'Low Risk';
-            const score = dailyLog.sleep < 5 ? 75 : dailyLog.sleep < 6.5 ? 45 : 15;
-            
-            saveToHistory(dailyLog, risk, score);
-            setIsAnalyzing(false);
-            setShowAdjustment(false);
-        }, 1500);
+        submitDailyLog();
     };
 
     useEffect(() => {
@@ -142,7 +149,7 @@ function Dashboard() {
                     <div className="fixed inset-0 z-50 bg-[#0b1c30]/60 backdrop-blur-sm flex items-end justify-center pb-12 px-4 sm:items-center pt-12">
                         <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-[slide-up_0.3s_ease-out] flex flex-col max-h-[85vh]">
                             <div className="flex justify-between items-center mb-4 shrink-0">
-                                <h2 className="text-xl font-bold text-[#0b1c30]">Adjust Today's Log</h2>
+                                <h2 className="text-xl font-bold text-[#0b1c30]">Adjust Today&apos;s Log</h2>
                                 <button onClick={() => setShowAdjustment(false)} className="text-[#737688] hover:text-[#ba1a1a]">
                                     <span className="material-symbols-outlined">close</span>
                                 </button>
@@ -182,7 +189,7 @@ function Dashboard() {
                 <section className="text-center space-y-6">
                     <div className="space-y-1">
                         <p className="text-sm font-medium text-[#003dcb] tracking-wide">COMPLETED • TODAY</p>
-                        <h2 className="text-2xl font-bold text-[#0b1c30]">Good evening, Nirbhay</h2>
+                        <h2 className="text-2xl font-bold text-[#0b1c30]">Your health overview</h2>
                     </div>
                     <div className="relative py-8 flex justify-center">
                         <div className={`absolute inset-0 ${styles.blur} blur-3xl rounded-full scale-75`}></div>
@@ -193,7 +200,9 @@ function Dashboard() {
                             <div className="text-center">
                                 <h3 className={`text-2xl font-bold ${styles.text}`}>{todayResult.level}</h3>
                                 <div className="bg-[#eff4ff] px-4 py-1.5 rounded-full mt-2 inline-block">
-                                    <span className="text-[#003dcb] font-bold text-lg">{todayResult.score}% Risk Score</span>
+                                    <span className="text-[#003dcb] font-bold text-lg">
+                                        {todayResult.score === null ? 'Complete a check-in to see your score' : `${todayResult.score}% Risk Score`}
+                                    </span>
                                 </div>
                             </div>
                         </div>

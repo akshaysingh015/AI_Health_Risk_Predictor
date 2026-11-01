@@ -37,12 +37,13 @@ function Register() {
 
         try {
             // Hits endpoint: POST /api/auth/register
-            await API.post('/auth/register', {
+            const response = await API.post('/auth/register', {
                 name: formData.name,
-                email: formData.email,
+                email: formData.email.trim(),
                 password: formData.password
             });
 
+            localStorage.setItem('token', response.data.token);
             triggerToast('Success', 'Clinical account created successfully.', 'check_circle', false);
             
             // Redirect straight to profile setup view
@@ -88,7 +89,7 @@ function Register() {
                                 name="name"
                                 value={formData.name}
                                 onChange={handleChange}
-                                placeholder="Dr. Sarah Connor" 
+                                placeholder="Your full name"
                                 type="text"
                                 required
                             />
@@ -105,7 +106,7 @@ function Register() {
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                placeholder="name@clinic.com" 
+                                placeholder="you@example.com"
                                 required 
                                 type="email"
                             />
@@ -122,7 +123,7 @@ function Register() {
                                 name="password"
                                 value={formData.password}
                                 onChange={handleChange}
-                                placeholder="••••••••" 
+                                placeholder="Create a secure password"
                                 required 
                                 type="password"
                             />

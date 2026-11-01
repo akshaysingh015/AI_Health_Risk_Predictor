@@ -11,25 +11,36 @@ const createHealthLog = async (req, res) => {
         } = req.body;
 
         if (
-            sleepHours === undefined || !dailySteps || !exerciseMinutes || 
-            screenTime === undefined || !stressLevel || waterIntake === undefined || 
+            sleepHours === undefined || dailySteps === undefined || exerciseMinutes === undefined ||
+            screenTime === undefined || stressLevel === undefined || waterIntake === undefined ||
             junkFoodFrequency === undefined
         ) {
             return res.status(400).json({ message: "Please fill out all daily metrics" });
         }
 
-        const aiResponse = await fetch(process.env.FLASK_API_URL + '/predict', {
+        if (!req.user.age || !req.user.bmi) {
+            return res.status(400).json({ message: "Please complete your health profile before submitting a daily log." });
+        }
+
+        const aiResponse = await fetch(`${process.env.FLASK_API_URL}/predict`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                sleepHours, dailySteps, exerciseMinutes, 
-                screenTime, stressLevel, waterIntake, junkFoodFrequency
+                Age: req.user.age,
+                BMI: req.user.bmi,
+                daily_steps: Number(dailySteps),
+                screen_time_hours: Number(screenTime),
+                water_intake_liters: Number(waterIntake),
+                junk_food_frequency: Number(junkFoodFrequency)
             })
         });
 
         const aiData = await aiResponse.json();
+        if (!aiResponse.ok || !aiData.risk || typeof aiData.confidence !== 'number') {
+            return res.status(502).json({ message: aiData.error || "AI analysis failed" });
+        }
 
         const log = await HealthLog.create({
             user: req.user.id, 
@@ -40,12 +51,15 @@ const createHealthLog = async (req, res) => {
             stressLevel,
             waterIntake,
             junkFoodFrequency,
-            aiRiskPrediction: aiData.prediction 
+            aiRiskPrediction: aiData.risk === "High" ? "High Risk" : "Low Risk",
+            aiConfidence: aiData.confidence
         });
 
         res.status(201).json({
             message: "Health log saved and analyzed by AI!",
-            log
+            log,
+            riskLevel: log.aiRiskPrediction,
+            riskScore: Math.round(aiData.confidence * 100)
         });
 
     } catch (error) {
