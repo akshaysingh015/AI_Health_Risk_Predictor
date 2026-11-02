@@ -1,17 +1,21 @@
 const rateLimit = require('express-rate-limit');
 
 const configuredAuthLimit = Number.parseInt(process.env.AUTH_RATE_LIMIT, 10);
+const authLimit = Number.isFinite(configuredAuthLimit) && configuredAuthLimit > 0
+    ? configuredAuthLimit
+    : 10;
 
-const authRateLimit = rateLimit({
+const createAuthRateLimit = (operation) => rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: Number.isFinite(configuredAuthLimit) && configuredAuthLimit > 0
-        ? configuredAuthLimit
-        : 10,
+    limit: authLimit,
     skipSuccessfulRequests: true,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { message: 'Too many authentication attempts. Please try again later.' }
+    message: { message: `Too many ${operation} attempts. Please try again later.` }
 });
+
+const authLoginRateLimit = createAuthRateLimit('login');
+const authRegisterRateLimit = createAuthRateLimit('registration');
 
 const predictionRateLimit = rateLimit({
     windowMs: 60 * 1000,
@@ -21,4 +25,8 @@ const predictionRateLimit = rateLimit({
     message: { message: 'Too many predictions requested. Please wait and try again.' }
 });
 
-module.exports = { authRateLimit, predictionRateLimit };
+module.exports = {
+    authLoginRateLimit,
+    authRegisterRateLimit,
+    predictionRateLimit
+};
