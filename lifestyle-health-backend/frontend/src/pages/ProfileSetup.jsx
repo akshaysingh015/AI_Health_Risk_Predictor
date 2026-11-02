@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 
@@ -16,7 +17,32 @@ function ProfileSetup() {
     });
 
     const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+    const [profileError, setProfileError] = useState('');
     const [toast, setToast] = useState({ show: false, title: '', message: '', icon: '', isError: false });
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            try {
+                const response = await API.get('/users/profile');
+                const profile = response.data;
+                setFormData({
+                    age: profile.age ?? '',
+                    gender: profile.gender ?? 'Male',
+                    height: profile.height ?? '',
+                    weight: profile.weight ?? '',
+                    smokingHabit: profile.smokingHabit ?? 'Non-smoker',
+                    alcoholConsumption: profile.alcoholConsumption ?? 'None'
+                });
+            } catch (requestError) {
+                if (requestError.response?.status === 401) navigate('/login');
+                else setProfileError('Unable to load your saved baseline data.');
+            } finally {
+                setIsLoadingProfile(false);
+            }
+        };
+        loadProfile();
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -56,28 +82,24 @@ function ProfileSetup() {
         }
     };
 
-    return (
-        <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30] relative overflow-hidden">
-            
-            {/* Top Navigation Bar */}
-            <header className="w-full top-0 sticky bg-[#eff4ff] shadow-sm z-50 flex justify-between items-center px-4 py-4">
-                <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[#003dcb]" style={{ fontVariationSettings: "'FILL' 1" }}>health_and_safety</span>
-                    <h1 className="text-xl md:text-2xl font-bold text-[#003dcb]">HealthSync AI</h1>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#434656] mr-2">Step 2 of 2</span>
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-[#d3e4fe] border border-[#c3c5d9]">
-                        <img 
-                            alt="Profile" 
-                            className="w-full h-full object-cover"
-                            src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&auto=format&fit=crop&q=80" 
-                        />
-                    </div>
-                </div>
-            </header>
+    const logout = () => {
+        localStorage.removeItem('token');
+        navigate('/login');
+    };
 
-            <main className="max-w-[1280px] mx-auto px-4 md:px-6 py-8 z-10 relative">
+    return (
+        <div className="app-shell dashboard-layout">
+            <aside className="sidebar">
+                <div className="brand"><span className="brand-mark material-symbols-outlined">health_and_safety</span><span>HealthSync AI</span></div>
+                <nav className="nav-list">
+                    <Link className="nav-link" to="/dashboard"><span className="material-symbols-outlined">dashboard</span><span>Overview</span></Link>
+                    <Link className="nav-link" to="/history"><span className="material-symbols-outlined">insights</span><span>Health history</span></Link>
+                    <Link className="nav-link active" to="/setup"><span className="material-symbols-outlined">person</span><span>Profile</span></Link>
+                </nav>
+                <div className="sidebar-bottom"><button className="nav-link" onClick={logout}><span className="material-symbols-outlined">logout</span><span>Sign out</span></button></div>
+            </aside>
+            <main className="main-content">
+                <header className="topbar"><div><div className="eyebrow">Personal baseline</div><h1>Your profile</h1></div><div className="avatar">HS</div></header>
                 <div className="max-w-2xl mx-auto">
                     
                     {/* Contextual Intro */}
@@ -92,6 +114,27 @@ function ProfileSetup() {
                     <div className="w-full h-2 bg-[#d3e4fe] rounded-full mb-10 overflow-hidden">
                         <div className="h-full bg-[#003dcb] rounded-full transition-all duration-1000" style={{ width: '100%' }}></div>
                     </div>
+
+                    <section className="bg-white border border-[#c3c5d9] rounded-xl p-6 md:p-8 shadow-sm mb-6">
+                        <div className="flex items-center justify-between gap-4 mb-5">
+                            <div>
+                                <div className="text-xs font-bold uppercase tracking-wider text-[#003dcb]">Saved baseline</div>
+                                <h3 className="text-xl font-bold mt-1">Your registration health data</h3>
+                            </div>
+                            <span className="material-symbols-outlined text-[#006c49]">verified</span>
+                        </div>
+                        {isLoadingProfile ? <p className="text-sm text-[#434656]">Loading your saved data…</p> : profileError ? <p className="text-sm text-[#ba1a1a]" role="alert">{profileError}</p> : <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                                ['Age', formData.age ? `${formData.age} years` : 'Not set'],
+                                ['Gender', formData.gender || 'Not set'],
+                                ['Height', formData.height ? `${formData.height} cm` : 'Not set'],
+                                ['Weight', formData.weight ? `${formData.weight} kg` : 'Not set'],
+                                ['BMI', formData.height && formData.weight ? (formData.weight / ((formData.height / 100) ** 2)).toFixed(1) : 'Not set'],
+                                ['Smoking', formData.smokingHabit || 'Not set'],
+                                ['Alcohol', formData.alcoholConsumption || 'Not set']
+                            ].map(([label, value]) => <div key={label} className="rounded-lg bg-[#f8f9ff] p-3"><div className="text-xs text-[#434656]">{label}</div><div className="font-semibold mt-1">{value}</div></div>)}
+                        </div>}
+                    </section>
 
                     {/* Profile Form Card */}
                     <section className="bg-white border border-[#c3c5d9] rounded-xl p-6 md:p-8 shadow-sm">
@@ -265,12 +308,6 @@ function ProfileSetup() {
                 </div>
             </div>
 
-            {/* Background Decorative Element */}
-            <div className="fixed top-0 right-0 -z-10 w-1/3 h-full opacity-5 pointer-events-none">
-                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,79.6,-45.8C87.4,-32.5,90,-16.3,88.5,-0.9C87,14.5,81.4,29.1,72.6,41.4C63.8,53.7,51.8,63.7,38.3,71C24.8,78.3,9.8,83,-4.2,90.3C-18.2,97.6,-31.2,107.5,-42.1,104.9C-53,102.3,-61.8,87.2,-68.8,74.1C-75.8,61,-81,50,-85.4,37.9C-89.8,25.8,-93.4,12.9,-92.4,0.6C-91.4,-11.7,-85.8,-23.4,-78.9,-34.5C-72,-45.6,-63.8,-56.1,-53.1,-65.1C-42.4,-74.1,-29.2,-81.6,-15.1,-85.3C-1,-89,-1,-89,-14.1,-83.6C-27.2,-78.2,-14.1,-83.6,-1,-89C13.1,-94.4,27.2,-89,44.7,-76.4Z" fill="#003dcb" transform="translate(100 100)"></path>
-                </svg>
-            </div>
         </div>
     );
 }

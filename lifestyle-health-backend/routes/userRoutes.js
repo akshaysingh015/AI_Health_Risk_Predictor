@@ -31,7 +31,20 @@ router.post('/daily-log', protect, async (req, res) => {
         const dailyData = req.body;
         const numericFields = ['sleep', 'steps', 'exercise', 'screenTime', 'water', 'junkFood'];
         const values = Object.fromEntries(numericFields.map((field) => [field, Number(dailyData[field])]));
-        const hasInvalidValue = numericFields.some((field) => !Number.isFinite(values[field]) || values[field] < 0);
+        const limits = {
+            sleep: [0, 24],
+            steps: [0, 100000],
+            exercise: [0, 1440],
+            screenTime: [0, 24],
+            water: [0, 20],
+            junkFood: [0, 20]
+        };
+        const hasInvalidValue = numericFields.some((field) => {
+            const [minimum, maximum] = limits[field];
+            return !Number.isFinite(values[field]) ||
+                values[field] < minimum ||
+                values[field] > maximum;
+        });
 
         if (hasInvalidValue || !['Low', 'Moderate', 'High'].includes(dailyData.stressLevel)) {
             return res.status(400).json({ message: 'Please provide valid daily health metrics.' });
@@ -41,6 +54,7 @@ router.post('/daily-log', protect, async (req, res) => {
             return res.status(400).json({ message: 'Please complete your health profile before submitting a daily log.' });
         }
 
+        const stressValue = { Low: 1, Moderate: 5, High: 10 }[dailyData.stressLevel];
         const payload = {
             Age: req.user.age,
             BMI: req.user.bmi,
@@ -50,7 +64,7 @@ router.post('/daily-log', protect, async (req, res) => {
             junk_food_frequency: values.junkFood,
             sleep_hours: values.sleep,
             exercise_minutes: values.exercise,
-            stress_level: { Low: 1, Moderate: 5, High: 10 }[dailyData.stressLevel]
+            stress_level: stressValue
         };
 
         const pythonResponse = await fetch(`${process.env.FLASK_API_URL}/predict`, {
@@ -78,7 +92,7 @@ router.post('/daily-log', protect, async (req, res) => {
             dailySteps: values.steps,
             exerciseMinutes: values.exercise,
             screenTime: values.screenTime,
-            stressLevel: { Low: 1, Moderate: 5, High: 10 }[dailyData.stressLevel],
+            stressLevel: stressValue,
             waterIntake: values.water,
             junkFoodFrequency: values.junkFood,
             aiRiskPrediction: riskLevel,

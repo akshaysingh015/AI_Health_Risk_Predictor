@@ -38,7 +38,12 @@ const updateUserProfile = async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 age: updatedUser.age,
-                bmi: updatedUser.bmi
+                gender: updatedUser.gender,
+                height: updatedUser.height,
+                weight: updatedUser.weight,
+                bmi: updatedUser.bmi,
+                smokingHabit: updatedUser.smokingHabit,
+                alcoholConsumption: updatedUser.alcoholConsumption
             }
         });
 

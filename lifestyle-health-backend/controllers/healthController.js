@@ -1,4 +1,5 @@
 const HealthLog = require('../models/HealthLog');
+const stressValues = { Low: 1, Moderate: 5, High: 10 };
 
 // @desc    Create a new daily health log
 // @route   POST /api/health
@@ -9,11 +10,22 @@ const createHealthLog = async (req, res) => {
             sleepHours, dailySteps, exerciseMinutes,
             screenTime, stressLevel, waterIntake, junkFoodFrequency
         } = req.body;
+        const numericValues = {
+            sleepHours: Number(sleepHours),
+            dailySteps: Number(dailySteps),
+            exerciseMinutes: Number(exerciseMinutes),
+            screenTime: Number(screenTime),
+            waterIntake: Number(waterIntake),
+            junkFoodFrequency: Number(junkFoodFrequency)
+        };
 
         if (
             sleepHours === undefined || dailySteps === undefined || exerciseMinutes === undefined ||
             screenTime === undefined || stressLevel === undefined || waterIntake === undefined ||
-            junkFoodFrequency === undefined
+            junkFoodFrequency === undefined ||
+            !Object.values(numericValues).every(Number.isFinite) ||
+            Object.values(numericValues).some((value) => value < 0) ||
+            !Object.prototype.hasOwnProperty.call(stressValues, stressLevel)
         ) {
             return res.status(400).json({ message: "Please fill out all daily metrics" });
         }
@@ -31,12 +43,12 @@ const createHealthLog = async (req, res) => {
                 Age: req.user.age,
                 BMI: req.user.bmi,
                 daily_steps: Number(dailySteps),
-                screen_time_hours: Number(screenTime),
-                water_intake_liters: Number(waterIntake),
-                junk_food_frequency: Number(junkFoodFrequency),
-                sleep_hours: Number(sleepHours),
-                exercise_minutes: Number(exerciseMinutes),
-                stress_level: Number(stressLevel)
+                screen_time_hours: numericValues.screenTime,
+                water_intake_liters: numericValues.waterIntake,
+                junk_food_frequency: numericValues.junkFoodFrequency,
+                sleep_hours: numericValues.sleepHours,
+                exercise_minutes: numericValues.exerciseMinutes,
+                stress_level: stressValues[stressLevel]
             })
         });
 
@@ -52,13 +64,13 @@ const createHealthLog = async (req, res) => {
 
         const log = await HealthLog.create({
             user: req.user.id,
-            sleepHours,
-            dailySteps,
-            exerciseMinutes,
-            screenTime,
-            stressLevel,
-            waterIntake,
-            junkFoodFrequency,
+            sleepHours: numericValues.sleepHours,
+            dailySteps: numericValues.dailySteps,
+            exerciseMinutes: numericValues.exerciseMinutes,
+            screenTime: numericValues.screenTime,
+            stressLevel: stressValues[stressLevel],
+            waterIntake: numericValues.waterIntake,
+            junkFoodFrequency: numericValues.junkFoodFrequency,
             aiRiskPrediction: `${aiData.risk} Risk`,
             aiConfidence: aiData.confidence,
             aiRiskScore: aiData.risk_score

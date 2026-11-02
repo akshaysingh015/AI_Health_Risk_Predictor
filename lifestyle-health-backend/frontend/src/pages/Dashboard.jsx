@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 
 const initialLog = { sleep: 7.5, steps: 10000, exercise: 45, screenTime: 4, stressLevel: 'Low', water: 3, junkFood: 0 };
+const getRiskLabel = (score) => score >= 60 ? 'High Risk' : score >= 30 ? 'Moderate Risk' : 'Low Risk';
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -19,7 +20,7 @@ function Dashboard() {
                 const latest = response.data.history?.[0];
                 if (!latest) return;
                 const score = Number(((latest.aiRiskScore ?? (latest.aiRiskPrediction === 'High Risk' ? latest.aiConfidence : 1 - latest.aiConfidence)) * 100).toFixed(1));
-                setResult({ level: latest.aiRiskPrediction, score });
+                setResult({ level: getRiskLabel(score), score });
             } catch (requestError) {
                 if (requestError.response?.status === 401) navigate('/login');
             }

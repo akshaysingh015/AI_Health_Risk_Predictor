@@ -1,6 +1,8 @@
 import os
 import joblib
 import traceback
+import math
+import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -8,6 +10,8 @@ app = Flask(__name__)
 CORS(app, origins=os.environ.get("CLIENT_ORIGIN", "http://localhost:5173"))
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'health_risk_model.pkl')
+MODERATE_RISK_THRESHOLD = 0.30
+HIGH_RISK_THRESHOLD = 0.60
 
 def clamp(value, minimum=0.0, maximum=1.0):
     return max(minimum, min(maximum, value))
@@ -15,15 +19,15 @@ def clamp(value, minimum=0.0, maximum=1.0):
 
 def lifestyle_risk_score(data, model_high_probability):
     """Blend the trained model with every health signal collected by the app."""
-    bmi = float(data["BMI"])
-    age = float(data["Age"])
-    sleep = float(data["sleep_hours"])
-    steps = float(data["daily_steps"])
-    exercise = float(data["exercise_minutes"])
-    screen_time = float(data["screen_time_hours"])
-    stress = float(data["stress_level"])
-    water = float(data["water_intake_liters"])
-    junk_food = float(data["junk_food_frequency"])
+    bmi = data["BMI"]
+    age = data["Age"]
+    sleep = data["sleep_hours"]
+    steps = data["daily_steps"]
+    exercise = data["exercise_minutes"]
+    screen_time = data["screen_time_hours"]
+    stress = data["stress_level"]
+    water = data["water_intake_liters"]
+    junk_food = data["junk_food_frequency"]
 
     bmi_risk = clamp(abs(bmi - 22) / 15)
     age_risk = clamp((age - 40) / 40)
@@ -35,7 +39,7 @@ def lifestyle_risk_score(data, model_high_probability):
     water_risk = clamp((2 - water) / 2)
     junk_food_risk = clamp(junk_food / 5)
 
-    return (
+    return clamp(
         model_high_probability * 0.35
         + bmi_risk * 0.10
         + age_risk * 0.05
@@ -47,6 +51,54 @@ def lifestyle_risk_score(data, model_high_probability):
         + exercise_risk * 0.04
         + stress_risk * 0.03
     )
+
+
+FIELD_LIMITS = {
+    "Age": (1, 120),
+    "BMI": (10, 80),
+    "daily_steps": (0, 100000),
+    "screen_time_hours": (0, 24),
+    "water_intake_liters": (0, 20),
+    "junk_food_frequency": (0, 20),
+    "sleep_hours": (0, 24),
+    "exercise_minutes": (0, 1440),
+    "stress_level": (1, 10),
+}
+
+
+def parse_input(data):
+    values = {}
+    for field, (minimum, maximum) in FIELD_LIMITS.items():
+        if field not in data or isinstance(data[field], bool):
+            raise ValueError(f"Missing required field: '{field}'")
+
+        try:
+            value = float(data[field])
+        except (TypeError, ValueError):
+            raise ValueError(f"Field '{field}' must be a number.")
+
+        if not math.isfinite(value) or value < minimum or value > maximum:
+            raise ValueError(
+                f"Field '{field}' must be between {minimum} and {maximum}."
+            )
+        values[field] = value
+    return values
+
+
+def model_input(values):
+    columns = [
+        "Age",
+        "BMI",
+        "daily_steps",
+        "screen_time_hours",
+        "water_intake_liters",
+        "junk_food_frequency",
+    ]
+    features = [values[column] for column in columns]
+    feature_names = getattr(model, "feature_names_in_", None)
+    if feature_names is not None:
+        return pd.DataFrame([features], columns=feature_names)
+    return [features]
 
 
 try:
@@ -71,43 +123,18 @@ def predict_risk():
 
         data = request.get_json()
 
-        required_fields = [
-            "Age",
-            "BMI",
-            "daily_steps",
-            "screen_time_hours",
-            "water_intake_liters",
-            "junk_food_frequency",
-            "sleep_hours",
-            "exercise_minutes",
-            "stress_level"
-        ]
-
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error": f"Missing required field: '{field}'"}), 400
-
         try:
-            input_features = [
-                float(data["Age"]),
-                float(data["BMI"]),
-                float(data["daily_steps"]),
-                float(data["screen_time_hours"]),
-                float(data["water_intake_liters"]),
-                float(data["junk_food_frequency"])
-            ]
-        except ValueError as ve:
-            return jsonify({
-                "error": f"Data type error. Please ensure all inputs are numbers. Details: {str(ve)}"
-            }), 400
+            values = parse_input(data)
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
 
-        prediction = model.predict([input_features])[0]
-        probabilities = model.predict_proba([input_features])[0]
+        prediction_input = model_input(values)
+        probabilities = model.predict_proba(prediction_input)[0]
 
         classes = list(model.classes_)
         high_risk_index = next(
             (index for index, value in enumerate(classes)
-             if value == 1 or str(value).lower() == "high"),
+             if value == 1 or str(value).lower() in ("1", "high")),
             None
         )
         if high_risk_index is None:
@@ -115,10 +142,12 @@ def predict_risk():
 
         confidence = round(float(max(probabilities)), 4)
         model_high_probability = float(probabilities[high_risk_index])
-        high_risk_probability = round(lifestyle_risk_score(data, model_high_probability), 4)
+        high_risk_probability = round(
+            lifestyle_risk_score(values, model_high_probability), 4
+        )
         risk_level = (
-            "High" if high_risk_probability >= 0.66
-            else "Moderate" if high_risk_probability >= 0.33
+            "High" if high_risk_probability >= HIGH_RISK_THRESHOLD
+            else "Moderate" if high_risk_probability >= MODERATE_RISK_THRESHOLD
             else "Low"
         )
 
