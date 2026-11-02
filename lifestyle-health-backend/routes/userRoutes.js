@@ -47,7 +47,10 @@ router.post('/daily-log', protect, async (req, res) => {
             daily_steps: values.steps,
             screen_time_hours: values.screenTime,
             water_intake_liters: values.water,
-            junk_food_frequency: values.junkFood
+            junk_food_frequency: values.junkFood,
+            sleep_hours: values.sleep,
+            exercise_minutes: values.exercise,
+            stress_level: { Low: 1, Moderate: 5, High: 10 }[dailyData.stressLevel]
         };
 
         const pythonResponse = await fetch(`${process.env.FLASK_API_URL}/predict`, {
@@ -67,7 +70,7 @@ router.post('/daily-log', protect, async (req, res) => {
             return res.status(502).json({ message: aiResult.error || 'AI Engine returned an invalid response.' });
         }
 
-        const riskLevel = aiResult.risk === 'High' ? 'High Risk' : 'Low Risk';
+        const riskLevel = `${aiResult.risk} Risk`;
         const riskScore = Math.round(aiResult.risk_score * 100);
         const log = await HealthLog.create({
             user: req.user.id,

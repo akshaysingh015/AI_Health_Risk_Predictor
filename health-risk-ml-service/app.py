@@ -9,6 +9,46 @@ CORS(app, origins=os.environ.get("CLIENT_ORIGIN", "http://localhost:5173"))
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'health_risk_model.pkl')
 
+def clamp(value, minimum=0.0, maximum=1.0):
+    return max(minimum, min(maximum, value))
+
+
+def lifestyle_risk_score(data, model_high_probability):
+    """Blend the trained model with every health signal collected by the app."""
+    bmi = float(data["BMI"])
+    age = float(data["Age"])
+    sleep = float(data["sleep_hours"])
+    steps = float(data["daily_steps"])
+    exercise = float(data["exercise_minutes"])
+    screen_time = float(data["screen_time_hours"])
+    stress = float(data["stress_level"])
+    water = float(data["water_intake_liters"])
+    junk_food = float(data["junk_food_frequency"])
+
+    bmi_risk = clamp(abs(bmi - 22) / 15)
+    age_risk = clamp((age - 40) / 40)
+    sleep_risk = clamp(abs(sleep - 7.5) / 4)
+    steps_risk = clamp((7000 - steps) / 7000)
+    exercise_risk = clamp((30 - exercise) / 30)
+    screen_risk = clamp((screen_time - 4) / 6)
+    stress_risk = clamp((stress - 1) / 9)
+    water_risk = clamp((2 - water) / 2)
+    junk_food_risk = clamp(junk_food / 5)
+
+    return (
+        model_high_probability * 0.35
+        + bmi_risk * 0.10
+        + age_risk * 0.05
+        + steps_risk * 0.15
+        + screen_risk * 0.10
+        + water_risk * 0.05
+        + junk_food_risk * 0.05
+        + sleep_risk * 0.08
+        + exercise_risk * 0.04
+        + stress_risk * 0.03
+    )
+
+
 try:
     if os.path.exists(MODEL_PATH):
         model = joblib.load(MODEL_PATH)
@@ -28,16 +68,19 @@ def predict_risk():
     try:
         if not request.is_json:
             return jsonify({"error": "Invalid request format. Must be JSON."}), 400
-            
+
         data = request.get_json()
 
         required_fields = [
-            "Age", 
-            "BMI", 
-            "daily_steps", 
-            "screen_time_hours", 
-            "water_intake_liters", 
-            "junk_food_frequency"
+            "Age",
+            "BMI",
+            "daily_steps",
+            "screen_time_hours",
+            "water_intake_liters",
+            "junk_food_frequency",
+            "sleep_hours",
+            "exercise_minutes",
+            "stress_level"
         ]
 
         for field in required_fields:
@@ -71,13 +114,19 @@ def predict_risk():
             return jsonify({"error": "Model does not expose a high-risk class."}), 500
 
         confidence = round(float(max(probabilities)), 4)
-        high_risk_probability = round(float(probabilities[high_risk_index]), 4)
-        risk_level = "High" if prediction == 1 or str(prediction).lower() == 'high' else "Low"
+        model_high_probability = float(probabilities[high_risk_index])
+        high_risk_probability = round(lifestyle_risk_score(data, model_high_probability), 4)
+        risk_level = (
+            "High" if high_risk_probability >= 0.66
+            else "Moderate" if high_risk_probability >= 0.33
+            else "Low"
+        )
 
         return jsonify({
             "risk": risk_level,
             "risk_score": high_risk_probability,
-            "confidence": confidence
+            "confidence": confidence,
+            "model_risk_score": round(model_high_probability, 4)
         }), 200
 
     except Exception as e:

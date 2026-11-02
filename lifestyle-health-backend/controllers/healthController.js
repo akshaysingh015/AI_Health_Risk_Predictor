@@ -5,9 +5,9 @@ const HealthLog = require('../models/HealthLog');
 // @access  Private (Requires Token)
 const createHealthLog = async (req, res) => {
     try {
-        const { 
-            sleepHours, dailySteps, exerciseMinutes, 
-            screenTime, stressLevel, waterIntake, junkFoodFrequency 
+        const {
+            sleepHours, dailySteps, exerciseMinutes,
+            screenTime, stressLevel, waterIntake, junkFoodFrequency
         } = req.body;
 
         if (
@@ -33,7 +33,10 @@ const createHealthLog = async (req, res) => {
                 daily_steps: Number(dailySteps),
                 screen_time_hours: Number(screenTime),
                 water_intake_liters: Number(waterIntake),
-                junk_food_frequency: Number(junkFoodFrequency)
+                junk_food_frequency: Number(junkFoodFrequency),
+                sleep_hours: Number(sleepHours),
+                exercise_minutes: Number(exerciseMinutes),
+                stress_level: Number(stressLevel)
             })
         });
 
@@ -48,7 +51,7 @@ const createHealthLog = async (req, res) => {
         }
 
         const log = await HealthLog.create({
-            user: req.user.id, 
+            user: req.user.id,
             sleepHours,
             dailySteps,
             exerciseMinutes,
@@ -56,7 +59,7 @@ const createHealthLog = async (req, res) => {
             stressLevel,
             waterIntake,
             junkFoodFrequency,
-            aiRiskPrediction: aiData.risk === "High" ? "High Risk" : "Low Risk",
+            aiRiskPrediction: `${aiData.risk} Risk`,
             aiConfidence: aiData.confidence,
             aiRiskScore: aiData.risk_score
         });
