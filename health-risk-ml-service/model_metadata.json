@@ -1,0 +1,24 @@
+{
+  "model_version": "health-risk-model-v1-six-feature-hybrid",
+  "validation_status": "prototype_not_clinically_validated",
+  "artifact": "health_risk_model.pkl",
+  "sha256": "83b62a42da208fe9661c64211701b97e2e90ad40b06bfc7241c07d735965d487",
+  "trained_with": {
+    "scikit-learn": "1.6.1",
+    "pandas": "2.2.0",
+    "numpy": "1.26.4",
+    "joblib": "1.3.2"
+  },
+  "features": [
+    "Age",
+    "BMI",
+    "daily_steps",
+    "screen_time_hours",
+    "water_intake_liters",
+    "junk_food_frequency"
+  ],
+  "classes": [
+    "High",
+    "Low"
+  ]
+}

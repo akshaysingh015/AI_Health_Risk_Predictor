@@ -9,13 +9,16 @@ import ProfileSetup from './pages/ProfileSetup';
 import TargetSetup from './pages/TargetSetup';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
+import ProtectedRoute from './components/ProtectedRoute';
+import Privacy from './pages/Privacy';
 
 function App() {
     useEffect(() => {
         const syncNotificationToken = async () => {
-            if (!localStorage.getItem('token') || !('Notification' in window)) return;
+            if (!('Notification' in window)) return;
 
             try {
+                await API.get('/users/profile');
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') return;
 
@@ -44,10 +47,13 @@ function App() {
                     <Route path="/" element={<Navigate to="/login" />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
-                    <Route path="/setup" element={<ProfileSetup />} />
-                    <Route path="/target-setup" element={<TargetSetup />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/history" element={<History />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route element={<ProtectedRoute />}>
+                        <Route path="/setup" element={<ProfileSetup />} />
+                        <Route path="/target-setup" element={<TargetSetup />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/history" element={<History />} />
+                    </Route>
                 </Routes>
             </div>
         </Router>

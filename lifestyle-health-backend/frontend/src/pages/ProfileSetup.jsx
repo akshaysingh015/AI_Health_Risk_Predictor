@@ -72,8 +72,7 @@ function ProfileSetup() {
 
             triggerToast('Profile Verified', 'Biometric data calibrated successfully.', 'check_circle', false);
             
-            // Redirect to the Target Setup page to start submitting daily logs!
-            setTimeout(() => navigate('/target-setup'), 1500);
+            navigate('/target-setup');
         } catch (error) {
             console.error(error);
             triggerToast('Update Failed', 'Could not save profile data.', 'error', true);
@@ -82,9 +81,35 @@ function ProfileSetup() {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
+    const logout = async () => {
+        await API.post('/auth/logout');
         navigate('/login');
+    };
+
+    const exportData = async () => {
+        try {
+            const response = await API.get('/users/export');
+            const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'healthsync-data.json';
+            link.click();
+            URL.revokeObjectURL(url);
+            triggerToast('Export ready', 'Your health data has been downloaded.', 'download', false);
+        } catch (error) {
+            triggerToast('Export failed', error.response?.data?.message || 'Unable to export your data.', 'error', true);
+        }
+    };
+
+    const deleteAccount = async () => {
+        if (!window.confirm('Delete your account and all health history permanently? This cannot be undone.')) return;
+        try {
+            await API.delete('/users/account');
+            navigate('/login', { replace: true });
+        } catch (error) {
+            triggerToast('Deletion failed', error.response?.data?.message || 'Unable to delete your account.', 'error', true);
+        }
     };
 
     return (
@@ -291,6 +316,16 @@ function ProfileSetup() {
                                 </button>
                             </div>
                         </form>
+                    </section>
+                    <section className="panel privacy-controls">
+                        <div className="eyebrow">Privacy controls</div>
+                        <h3>Manage your data</h3>
+                        <p>Export a copy of your profile and health history, or permanently delete your account and health records.</p>
+                        <div className="privacy-actions">
+                            <button className="soft-btn privacy-button" type="button" onClick={exportData}>Export my data</button>
+                            <button className="danger-btn" type="button" onClick={deleteAccount}>Delete account</button>
+                        </div>
+                        <Link to="/privacy">Read the privacy policy</Link>
                     </section>
                 </div>
             </main>

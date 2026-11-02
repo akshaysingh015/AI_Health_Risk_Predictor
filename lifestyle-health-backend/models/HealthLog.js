@@ -36,9 +36,24 @@ const healthLogSchema = new mongoose.Schema({
         type: Number,
         min: 0,
         max: 1
+    },
+    modelRiskScore: { type: Number, min: 0, max: 1 },
+    modelProbability: { type: Number, min: 0, max: 1 },
+    ruleBasedScore: { type: Number, min: 0, max: 1 },
+    featureContributions: { type: Map, of: Number },
+    inputSnapshot: { type: mongoose.Schema.Types.Mixed },
+    recommendations: [{ type: String }],
+    riskScore: { type: Number, min: 0, max: 1 },
+    riskLevel: { type: String, enum: ['Low Risk', 'Moderate Risk', 'High Risk', 'Unknown Risk'] },
+    scoreMethod: { type: String },
+    modelVersion: {
+        type: String,
+        default: "health-risk-model-v1"
     }
 }, {
     timestamps: true 
 });
+
+healthLogSchema.index({ user: 1, logDate: -1 });
 
 module.exports = mongoose.model('HealthLog', healthLogSchema);

@@ -13,15 +13,23 @@ function Register() {
         setError('');
         setIsLoading(true);
         try {
-            const response = await API.post('/auth/register', {
+            await API.post('/auth/register', {
                 name: formData.name.trim(),
                 email: formData.email.trim(),
                 password: formData.password
             });
-            localStorage.setItem('token', response.data.token);
             navigate('/setup');
         } catch (requestError) {
-            setError(requestError.response?.data?.message || 'Unable to create your account.');
+            const retryAfter = requestError.response?.headers?.['retry-after'];
+            const retryMessage = retryAfter
+                ? ` Please try again in about ${Math.ceil(Number(retryAfter) / 60)} minutes.`
+                : '';
+            const message = requestError.code === 'ECONNABORTED'
+                ? 'The server took too long to respond. Please try again.'
+                : !requestError.response
+                    ? 'Cannot connect to the server. Please start the backend and try again.'
+                    : requestError.response.data?.message || 'Unable to create your account.';
+            setError(message + retryMessage);
         } finally {
             setIsLoading(false);
         }
@@ -47,7 +55,7 @@ function Register() {
                     <form onSubmit={handleSubmit}>
                         <div className="field"><label htmlFor="name">Full name</label><input id="name" name="name" autoComplete="name" placeholder="Your full name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
                         <div className="field"><label htmlFor="email">Email address</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required /></div>
-                        <div className="field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="new-password" placeholder="Create a secure password" minLength="8" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required /></div>
+                        <div className="field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="new-password" placeholder="8+ chars, upper/lowercase and number" minLength="8" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required /></div>
                         <button className="primary-btn full-btn" disabled={isLoading}>{isLoading ? 'Creating account…' : 'Create my account →'}</button>
                     </form>
                     <div className="auth-footer">Already have an account? <Link to="/login">Sign in</Link></div>

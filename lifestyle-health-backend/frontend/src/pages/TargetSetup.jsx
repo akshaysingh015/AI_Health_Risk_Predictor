@@ -1,9 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API from '../services/api';
 
 function TargetSetup() {
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const loadTargets = async () => {
+            try {
+                const response = await API.get('/users/targets');
+                if (response.data) setTargets((current) => ({ ...current, ...response.data }));
+            } catch (requestError) {
+                if (requestError.response?.status === 401) navigate('/login');
+            }
+        };
+        loadTargets();
+    }, [navigate]);
 
     // All 7 required daily metrics for the AI baseline
     const [targets, setTargets] = useState({
@@ -21,13 +35,27 @@ function TargetSetup() {
         setTargets({ ...targets, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
 
-        localStorage.setItem('healthTargets', JSON.stringify(targets));
-        setIsLoading(false);
-        navigate('/dashboard');
+        setError('');
+        try {
+            await API.put('/users/targets', {
+                ...targets,
+                sleep: Number(targets.sleep),
+                steps: Number(targets.steps),
+                exercise: Number(targets.exercise),
+                screenTime: Number(targets.screenTime),
+                water: Number(targets.water),
+                junkFood: Number(targets.junkFood)
+            });
+            navigate('/dashboard');
+        } catch (requestError) {
+            setError(requestError.response?.data?.message || 'Unable to save your targets.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -48,6 +76,7 @@ function TargetSetup() {
                         Define your perfect day across all 7 health metrics. The AI will use these to track your daily progress.
                     </p>
                 </section>
+                {error && <div className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     

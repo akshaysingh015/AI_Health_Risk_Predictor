@@ -31,14 +31,22 @@ function Login() {
         setError('');
         setIsLoading(true);
         try {
-            const response = await API.post('/auth/login', {
+            await API.post('/auth/login', {
                 email: formData.email.trim(),
                 password: formData.password
             });
-            localStorage.setItem('token', response.data.token);
             navigate('/setup');
         } catch (requestError) {
-            setError(requestError.response?.data?.message || 'Unable to sign in. Please check your details.');
+            const retryAfter = requestError.response?.headers?.['retry-after'];
+            const retryMessage = retryAfter
+                ? ` Please try again in about ${Math.ceil(Number(retryAfter) / 60)} minutes.`
+                : '';
+            const message = requestError.code === 'ECONNABORTED'
+                ? 'The server took too long to respond. Please try again.'
+                : !requestError.response
+                    ? 'Cannot connect to the server. Please start the backend and try again.'
+                    : requestError.response.data?.message || 'Unable to sign in. Please check your details.';
+            setError(message + retryMessage);
         } finally {
             setIsLoading(false);
         }

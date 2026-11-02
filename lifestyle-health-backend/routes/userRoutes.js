@@ -1,13 +1,48 @@
 const express = require('express');
 const router = express.Router();
-const { updateUserProfile, getUserProfile } = require('../controllers/userController');
+const { updateUserProfile, getUserProfile, exportUserData, deleteAccount } = require('../controllers/userController');
+const { createHealthLog } = require('../controllers/healthController');
 const { protect } = require('../middleware/authMiddleware');
-const HealthLog = require('../models/HealthLog');
+const { predictionRateLimit } = require('../middleware/rateLimits');
 
 // Existing Profile Routes
 router.route('/profile')
     .get(protect, getUserProfile)
     .put(protect, updateUserProfile);
+
+router.get('/export', protect, exportUserData);
+router.delete('/account', protect, deleteAccount);
+
+router.route('/targets')
+    .get(protect, (req, res) => {
+        res.status(200).json(req.user.healthTargets || null);
+    })
+    .put(protect, async (req, res) => {
+        try {
+            const fields = ['sleep', 'steps', 'exercise', 'screenTime', 'water', 'junkFood'];
+            const limits = {
+                sleep: [0, 24], steps: [0, 100000], exercise: [0, 1440],
+                screenTime: [0, 24], water: [0, 20], junkFood: [0, 20]
+            };
+            const values = Object.fromEntries(fields.map((field) => [field, Number(req.body[field])]));
+            const invalidNumber = fields.some((field) => {
+                const [minimum, maximum] = limits[field];
+                return !Number.isFinite(values[field]) || values[field] < minimum || values[field] > maximum;
+            });
+            const validStress = ['Low', 'Moderate', 'High'].includes(req.body.stressLevel);
+            const validReminder = typeof req.body.reminderTime === 'string' &&
+                /^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.reminderTime);
+            if (invalidNumber || !validStress || !validReminder) {
+                return res.status(400).json({ message: 'Please provide valid health targets.' });
+            }
+            req.user.healthTargets = { ...values, stressLevel: req.body.stressLevel, reminderTime: req.body.reminderTime };
+            await req.user.save();
+            res.status(200).json(req.user.healthTargets);
+        } catch (error) {
+            console.error('Target update error:', error);
+            res.status(500).json({ message: 'Unable to save health targets.' });
+        }
+    });
 
 // 🎯 NEW ROUTE: Catch the Firebase Token from React
 router.post('/update-token', protect, async (req, res) => {
@@ -25,86 +60,7 @@ router.post('/update-token', protect, async (req, res) => {
     }
 });
 
-// Existing AI Daily Log Route (The Bridge to Python)
-router.post('/daily-log', protect, async (req, res) => {
-    try {
-        const dailyData = req.body;
-        const numericFields = ['sleep', 'steps', 'exercise', 'screenTime', 'water', 'junkFood'];
-        const values = Object.fromEntries(numericFields.map((field) => [field, Number(dailyData[field])]));
-        const limits = {
-            sleep: [0, 24],
-            steps: [0, 100000],
-            exercise: [0, 1440],
-            screenTime: [0, 24],
-            water: [0, 20],
-            junkFood: [0, 20]
-        };
-        const hasInvalidValue = numericFields.some((field) => {
-            const [minimum, maximum] = limits[field];
-            return !Number.isFinite(values[field]) ||
-                values[field] < minimum ||
-                values[field] > maximum;
-        });
-
-        if (hasInvalidValue || !['Low', 'Moderate', 'High'].includes(dailyData.stressLevel)) {
-            return res.status(400).json({ message: 'Please provide valid daily health metrics.' });
-        }
-
-        if (!req.user.age || !req.user.bmi) {
-            return res.status(400).json({ message: 'Please complete your health profile before submitting a daily log.' });
-        }
-
-        const stressValue = { Low: 1, Moderate: 5, High: 10 }[dailyData.stressLevel];
-        const payload = {
-            Age: req.user.age,
-            BMI: req.user.bmi,
-            daily_steps: values.steps,
-            screen_time_hours: values.screenTime,
-            water_intake_liters: values.water,
-            junk_food_frequency: values.junkFood,
-            sleep_hours: values.sleep,
-            exercise_minutes: values.exercise,
-            stress_level: stressValue
-        };
-
-        const pythonResponse = await fetch(`${process.env.FLASK_API_URL}/predict`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const aiResult = await pythonResponse.json();
-
-        if (
-            !pythonResponse.ok ||
-            !aiResult.risk ||
-            typeof aiResult.confidence !== 'number' ||
-            typeof aiResult.risk_score !== 'number'
-        ) {
-            return res.status(502).json({ message: aiResult.error || 'AI Engine returned an invalid response.' });
-        }
-
-        const riskLevel = `${aiResult.risk} Risk`;
-        const riskScore = Math.round(aiResult.risk_score * 100);
-        const log = await HealthLog.create({
-            user: req.user.id,
-            sleepHours: values.sleep,
-            dailySteps: values.steps,
-            exerciseMinutes: values.exercise,
-            screenTime: values.screenTime,
-            stressLevel: stressValue,
-            waterIntake: values.water,
-            junkFoodFrequency: values.junkFood,
-            aiRiskPrediction: riskLevel,
-            aiConfidence: aiResult.confidence,
-            aiRiskScore: aiResult.risk_score
-        });
-
-        res.status(201).json({ riskLevel, riskScore, log });
-    } catch (error) {
-        console.error("AI Bridge Error:", error);
-        res.status(500).json({ message: "AI Engine is unreachable." });
-    }
-});
+// Compatibility alias: use the same prediction controller as POST /api/health.
+router.post('/daily-log', protect, predictionRateLimit, createHealthLog);
 
 module.exports = router;

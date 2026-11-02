@@ -1,6 +1,19 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs'); 
 const jwt = require('jsonwebtoken');
+const {
+    validateRegistrationInput,
+    getRegistrationValidationMessage,
+    validateLoginInput
+} = require('../services/inputValidation');
+const logger = require('../services/logger');
+
+const authCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000
+};
 
 // 🎟️ Helper Function: Generate JWT (The VIP Pass)
 const generateToken = (id) => {
@@ -18,8 +31,10 @@ const registerUser = async (req, res) => {
             ? req.body.email.trim().toLowerCase()
             : '';
 
-        if (!name || !emailAddress || !password) {
-            return res.status(400).json({ message: "Please enter all fields" });
+        if (!validateRegistrationInput({ name, email: emailAddress, password })) {
+            return res.status(400).json({
+                message: getRegistrationValidationMessage({ name, email: emailAddress, password })
+            });
         }
 
         const userExists = await User.findOne({ email: emailAddress });
@@ -31,23 +46,30 @@ const registerUser = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const user = await User.create({
-            name,
+            name: name.trim(),
             email: emailAddress,
             password: hashedPassword
         });
 
-        // 👇 UPDATED: Now sends the token!
+        try {
+            res.cookie('access_token', generateToken(user._id), authCookieOptions);
+        } catch (tokenError) {
+            await User.deleteOne({ _id: user._id });
+            throw tokenError;
+        }
         res.status(201).json({
             _id: user.id,
             name: user.name,
             email: user.email,
-            token: generateToken(user._id),
             message: "User successfully registered!"
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error during registration" });
+        if (error.code === 11000) {
+            return res.status(409).json({ message: "User already exists" });
+        }
+        logger.error('Registration failed', { requestId: req.requestId, error: error.message });
+        res.status(500).json({ message: "Server error during registration", requestId: req.requestId });
     }
 };
 
@@ -60,8 +82,8 @@ const loginUser = async (req, res) => {
             ? req.body.email.trim().toLowerCase()
             : '';
 
-        if (!emailAddress || !password) {
-            return res.status(400).json({ message: "Please enter all fields" });
+        if (!validateLoginInput({ email: emailAddress, password })) {
+            return res.status(400).json({ message: "Enter a valid email and a password of at least 8 characters." });
         }
 
         const user = await User.findOne({ email: emailAddress });
@@ -75,19 +97,28 @@ const loginUser = async (req, res) => {
         }
 
         // 👇 UPDATED: Now sends the token!
+        res.cookie('access_token', generateToken(user._id), authCookieOptions);
         res.json({
             _id: user.id,
             name: user.name,
             email: user.email,
-            token: generateToken(user._id),
             message: "Login successful!"
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error during login" });
+        logger.error('Login failed', { requestId: req.requestId, error: error.message });
+        res.status(500).json({ message: "Server error during login", requestId: req.requestId });
     }
 };
 
+const logoutUser = (req, res) => {
+    res.clearCookie('access_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
+    res.status(200).json({ message: 'Logout successful.' });
+};
+
 // Export the controllers
-module.exports = { registerUser, loginUser };
+module.exports = { registerUser, loginUser, logoutUser };
