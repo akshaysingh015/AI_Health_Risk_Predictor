@@ -72,7 +72,7 @@ app.use((req, res, next) => {
         res.cookie('csrf_token', crypto.randomBytes(32).toString('hex'), {
             httpOnly: false,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax'
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
         });
     }
     next();

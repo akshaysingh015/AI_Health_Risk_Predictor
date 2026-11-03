@@ -43,6 +43,8 @@ function Login() {
                 : '';
             const message = requestError.code === 'ECONNABORTED'
                 ? 'The server took too long to respond. Please try again.'
+                : !API.defaults.baseURL
+                    ? 'The backend URL is not configured for this deployment.'
                 : !requestError.response
                     ? 'Cannot connect to the server. Please start the backend and try again.'
                     : requestError.response.data?.message || 'Unable to sign in. Please check your details.';
