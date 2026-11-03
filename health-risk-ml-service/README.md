@@ -21,6 +21,6 @@ If the service reports that the runtime has scikit-learn `1.4.0`, the wrong
 Python interpreter is being used. The model will remain unavailable until the
 service is started with the environment above.
 
-Render uses the Python version in `runtime.txt`. Keep the service on Python
+Render uses the Python version in `.python-version`. Keep the service on Python
 3.12 because the pinned scientific-package versions provide compatible wheels
 for that runtime.
